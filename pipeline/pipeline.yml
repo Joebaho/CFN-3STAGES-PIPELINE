@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CI/CD pipeline deploying EC2 in two regions
+Description: Cross-Region CodePipeline deploying EC2 via CloudFormation
 
 Parameters:
   GitHubOwner:
@@ -17,13 +17,40 @@ Parameters:
 
 Resources:
 
-  ArtifactBucket:
-    Type: AWS::S3::Bucket
+  #############################################
+  # IAM ROLE FOR CODEPIPELINE
+  #############################################
 
-  CodeBuildRole:
+  CodePipelineServiceRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: CodePipelineServiceRole
       AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodePipelinePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: "*"
+                Resource: "*"
+
+  #############################################
+  # IAM ROLE FOR CODEBUILD
+  #############################################
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CodeBuildServiceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
@@ -32,53 +59,60 @@ Resources:
       Policies:
         - PolicyName: CodeBuildPolicy
           PolicyDocument:
+            Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action: "*"
                 Resource: "*"
+
+  #############################################
+  # CODEBUILD PROJECT
+  #############################################
 
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Name: CrossRegionBuild
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
       Artifacts:
         Type: CODEPIPELINE
       Environment:
         ComputeType: BUILD_GENERAL1_SMALL
-        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        Image: aws/codebuild/standard:7.0
         Type: LINUX_CONTAINER
       Source:
         Type: CODEPIPELINE
 
-  PipelineRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: codepipeline.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: PipelinePolicy
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Action: "*"
-                Resource: "*"
+  #############################################
+  # CODEPIPELINE
+  #############################################
 
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
-      RoleArn: !GetAtt PipelineRole.Arn
-      ArtifactStore:
-        Type: S3
-        Location: !Ref ArtifactBucket
+      Name: CrossRegionPipeline
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+
+      ArtifactStores:
+        - Region: us-west-2
+          ArtifactStore:
+            Type: S3
+            Location: pipeline-artifacts-west2
+
+        - Region: us-west-1
+          ArtifactStore:
+            Type: S3
+            Location: pipeline-artifacts-west1
+
       Stages:
+
+        #########################################
+        # SOURCE STAGE
+        #########################################
 
         - Name: Source
           Actions:
-            - Name: GitHubSource
+            - Name: SourceAction
               ActionTypeId:
                 Category: Source
                 Owner: ThirdParty
@@ -92,9 +126,13 @@ Resources:
                 Branch: !Ref GitHubBranch
                 OAuthToken: !Ref GitHubToken
 
+        #########################################
+        # BUILD STAGE
+        #########################################
+
         - Name: Build
           Actions:
-            - Name: ValidateTemplate
+            - Name: BuildAction
               ActionTypeId:
                 Category: Build
                 Owner: AWS
@@ -107,7 +145,11 @@ Resources:
               Configuration:
                 ProjectName: !Ref CodeBuildProject
 
-        - Name: DeployDEV
+        #########################################
+        # DEPLOY DEV (us-west-2)
+        #########################################
+
+        - Name: DeployDev
           Actions:
             - Name: CFNDeployDEV
               Region: us-west-2
@@ -117,30 +159,22 @@ Resources:
                 Provider: CloudFormation
                 Version: 1
               InputArtifacts:
-                - Name: SourceOutput
+                - Name: BuildOutput
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: demo-ec2-dev
-                TemplatePath: SourceOutput::infrastructure/ec2-stack.yaml
+                StackName: DevStack
+                TemplatePath: BuildOutput::ec2.yml
                 Capabilities: CAPABILITY_NAMED_IAM
-                RoleArn: !GetAtt PipelineRole.Arn
-                Region: us-west-2
-                ParameterOverrides: |
+                ParameterOverrides: !Sub |
                   {
-                    "KeyName": "pipeline-key",
-                    "MyName": "Joseph - DEV"
+                    "KeyName": "pipeline-key"
                   }
-              RunOrder: 1
-        - Name: Approval
-          Actions:
-            - Name: ManualApproval
-              ActionTypeId:
-                Category: Approval
-                Owner: AWS
-                Provider: Manual
-                Version: 1
 
-        - Name: DeployPROD
+        #########################################
+        # DEPLOY PROD (us-west-1)
+        #########################################
+
+        - Name: DeployProd
           Actions:
             - Name: CFNDeployPROD
               Region: us-west-1
@@ -150,17 +184,15 @@ Resources:
                 Provider: CloudFormation
                 Version: 1
               InputArtifacts:
-                - Name: SourceOutput
+                - Name: BuildOutput
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: demo-ec2-prod
-                TemplatePath: SourceOutput::infrastructure/ec2-stack.yaml
+                StackName: ProdStack
+                TemplatePath: BuildOutput::ec2.yml
                 Capabilities: CAPABILITY_NAMED_IAM
-                RoleArn: !GetAtt PipelineRole.Arn
-                Region: us-west-1
-                ParameterOverrides: |
+                ParameterOverrides: !Sub |
                   {
-                    "KeyName": "pipeline-key",
-                    "MyName": "Joseph - PROD"
+                    "KeyName": "pipeline-key"
                   }
-              RunOrder: 1    
+
+

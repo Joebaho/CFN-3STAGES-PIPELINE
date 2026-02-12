@@ -10,8 +10,8 @@ env:
 phases:
   install:
     commands:
-      - echo Installing AWS CLI
-      - yum install -y aws-cli
+      - echo "Build started successfully"
+      
 
   build:
     commands:
