@@ -5,7 +5,7 @@ env:
     STACK_NAME_DEV: "demo-ec2-dev"
     STACK_NAME_PROD: "demo-ec2-prod"
     TEMPLATE_FILE: "infrastructure/ec2-stack.yaml"
-    KEY_NAME: "ansible-key"
+    KEY_NAME: "pipeline-key"
 
 phases:
   install:

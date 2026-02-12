@@ -110,6 +110,7 @@ Resources:
         - Name: DeployDEV
           Actions:
             - Name: CFNDeployDEV
+              Region: us-west-2
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
@@ -126,10 +127,10 @@ Resources:
                 Region: us-west-2
                 ParameterOverrides: |
                   {
-                    "KeyName": "${KeyName}",
+                    "KeyName": "pipeline-key",
                     "MyName": "Joseph - DEV"
                   }
-
+              RunOrder: 1
         - Name: Approval
           Actions:
             - Name: ManualApproval
@@ -142,6 +143,7 @@ Resources:
         - Name: DeployPROD
           Actions:
             - Name: CFNDeployPROD
+              Region: us-west-1
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
@@ -158,6 +160,7 @@ Resources:
                 Region: us-west-1
                 ParameterOverrides: |
                   {
-                    "KeyName": "${KeyName}",
+                    "KeyName": "pipeline-key",
                     "MyName": "Joseph - PROD"
                   }
+              RunOrder: 1    
