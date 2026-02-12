@@ -14,13 +14,13 @@ Parameters:
     NoEcho: true
   KeyName:
     Type: String
+    Description: EC2 KeyPair name (must exist in us-west-2 and us-west-1)
 
 Resources:
 
   #############################################
   # IAM ROLE FOR CODEPIPELINE
   #############################################
-
   CodePipelineServiceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -44,7 +44,6 @@ Resources:
   #############################################
   # IAM ROLE FOR CODEBUILD
   #############################################
-
   CodeBuildServiceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -66,9 +65,31 @@ Resources:
                 Resource: "*"
 
   #############################################
+  # IAM ROLE FOR CLOUDFORMATION EXECUTION
+  #############################################
+  CloudFormationDeploymentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudFormationDeploymentRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudFormationDeploymentPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: "*"   # Restrict in production (e.g., ec2, s3, iam:PassRole)
+                Resource: "*"
+
+  #############################################
   # CODEBUILD PROJECT
   #############################################
-
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
@@ -86,7 +107,6 @@ Resources:
   #############################################
   # CODEPIPELINE
   #############################################
-
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
@@ -97,19 +117,18 @@ Resources:
         - Region: us-west-2
           ArtifactStore:
             Type: S3
-            Location: pipeline-artifacts-west2
+            Location: pipeline-artifacts-west2   # Must be globally unique and exist
 
         - Region: us-west-1
           ArtifactStore:
             Type: S3
-            Location: pipeline-artifacts-west1
+            Location: pipeline-artifacts-west1   # Must be globally unique and exist
 
       Stages:
 
         #########################################
         # SOURCE STAGE
         #########################################
-
         - Name: Source
           Actions:
             - Name: SourceAction
@@ -129,7 +148,6 @@ Resources:
         #########################################
         # BUILD STAGE
         #########################################
-
         - Name: Build
           Actions:
             - Name: BuildAction
@@ -148,7 +166,6 @@ Resources:
         #########################################
         # DEPLOY DEV (us-west-2)
         #########################################
-
         - Name: DeployDev
           Actions:
             - Name: CFNDeployDEV
@@ -161,19 +178,19 @@ Resources:
               InputArtifacts:
                 - Name: BuildOutput
               Configuration:
+                RoleArn: !GetAtt CloudFormationDeploymentRole.Arn
                 ActionMode: CREATE_UPDATE
                 StackName: DevStack
-                TemplatePath: BuildOutput::ec2.yml
+                TemplatePath: BuildOutput::infrastructure/ec2-stack.yaml
                 Capabilities: CAPABILITY_NAMED_IAM
                 ParameterOverrides: !Sub |
                   {
-                    "KeyName": "pipeline-key"
+                    "KeyName": "${KeyName}"
                   }
 
         #########################################
         # DEPLOY PROD (us-west-1)
         #########################################
-
         - Name: DeployProd
           Actions:
             - Name: CFNDeployPROD
@@ -186,13 +203,14 @@ Resources:
               InputArtifacts:
                 - Name: BuildOutput
               Configuration:
+                RoleArn: !GetAtt CloudFormationDeploymentRole.Arn
                 ActionMode: CREATE_UPDATE
                 StackName: ProdStack
-                TemplatePath: BuildOutput::ec2.yml
+                TemplatePath: BuildOutput::infrastructure/ec2-stack.yaml
                 Capabilities: CAPABILITY_NAMED_IAM
                 ParameterOverrides: !Sub |
                   {
-                    "KeyName": "pipeline-key"
+                    "KeyName": "${KeyName}"
                   }
 
 
