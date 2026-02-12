@@ -1,0 +1,23 @@
+version: 0.2
+
+env:
+  variables:
+    STACK_NAME_DEV: "demo-ec2-dev"
+    STACK_NAME_PROD: "demo-ec2-prod"
+    TEMPLATE_FILE: "infrastructure/ec2-stack.yaml"
+    KEY_NAME: "ansible-key"
+
+phases:
+  install:
+    commands:
+      - echo Installing AWS CLI
+      - yum install -y aws-cli
+
+  build:
+    commands:
+      - echo Validating CloudFormation template
+      - aws cloudformation validate-template --template-body file://$TEMPLATE_FILE
+
+artifacts:
+  files:
+    - infrastructure/ec2-stack.yaml
