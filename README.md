@@ -169,6 +169,8 @@ Manual trigger: You can also release a change via the AWS CodePipeline console.
 
 Monitor the pipeline in the AWS Console (CodePipeline → CrossRegionPipeline).
 
+![crossregion pipeline](images/crossregionpipeline.png)  
+
 ## Expected outcome:
 
 Two CloudFormation stacks (DevStack in us-west-2, ProdStack in us-west-1) are created/updated.
@@ -184,6 +186,8 @@ aws cloudformation describe-stacks --stack-name DevStack --region us-west-2 --qu
 ```
 
 Open http://<PUBLIC_IP> in your browser to see the welcome page.
+
+![web page](images/webpage.png)  
 
 ## 🧹 Cleanup
 
