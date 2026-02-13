@@ -28,7 +28,7 @@ A **3‑stage CI/CD pipeline** built with AWS native services (CodePipeline, Cod
 ## 🏗 Architecture
 
 ![Pipeline Architecture](images/architecture.png)  
-*(You can add a diagram – a simple version is described below)*
+
 
 The pipeline consists of three stages:
 
@@ -65,19 +65,26 @@ The pipeline consists of three stages:
 
 ## 📁 Repository Structure
 
+```
 CFN-3STAGES-PIPELINE/
 ├── infrastructure/
-│ └── ec2-stack.yaml             # CloudFormation template for EC2 + VPC
-├── pipeline/
-│ └── pipeline.yml               # Main pipeline CloudFormation template
-├── buildspec.yml                # CodeBuild instructions
+│      └── ec2-stack.yaml.      # CloudFormation template for EC2 + VPC
+│
+├── pipeline/        
+│      └── pipeline.yml          # Main pipeline CloudFormation template
+│                           
 ├── scripts/                     # Helper scripts
+│      └── deploy-pipeline.sh 
+│      └── cleanup.sh        
+│
 ├── images/                      # Architecture diagrams
+│      └── architecture.png
+│
+├── buildspec.yml                # CodeBuild instructions 
+│
 └── README.md
+```
 
-text
-
----
 
 ## 🚀 Setup & Deployment
 
